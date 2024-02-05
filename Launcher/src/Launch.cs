@@ -1,12 +1,9 @@
-﻿using Ionic.Zip;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.IO;
 using System.Text;
+using BlockifyLib.Launcher;
 
-namespace BlockifyLib.BlockifyLib.Launcher.src
+namespace BlockifyLib.Launcher.src
 {
 
     public class Launch

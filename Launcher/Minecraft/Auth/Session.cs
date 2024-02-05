@@ -1,4 +1,4 @@
-﻿namespace BlockifyLib.BlockifyLib.Launcher.Minecraft
+﻿namespace BlockifyLib.Launcher.Minecraft.Auth
 {
     public class Session
     {
@@ -28,7 +28,7 @@
 
         internal static Session createEmpty()
         {
-            Session session = new Session() 
+            Session session = new Session()
             {
                 Username = "",
                 AccessToken = "",

@@ -1,12 +1,13 @@
-﻿using BlockifyLib.BlockifyLib.Launcher.Minecraft;
+﻿using BlockifyLib.Launcher;
+using BlockifyLib.Launcher.Minecraft.Auth;
 
-namespace BlockifyLib.BlockifyLib.Launcher.src
+namespace BlockifyLib.Launcher.src
 {
     public class LaunchOption
     {
         public string JavaPath { get; set; } = "";
         public int MaximumRamMb { get; set; } = 1024;
-        public Profile StartProfile { get; set; } = null;
+        public Version StartProfile { get; set; } = null;
         public Session Session { get; set; } = null;
         public string LauncherName { get; set; } = "";
         public string ServerIp { get; set; } = "";

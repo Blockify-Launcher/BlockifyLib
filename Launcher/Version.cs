@@ -3,7 +3,7 @@ using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Net;
 
-namespace BlockifyLib.BlockifyLib.Launcher
+namespace BlockifyLib.Launcher
 {
     public partial class ProfileInfo
     {
@@ -25,7 +25,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
         {
             ProfileInfo? other = obj as ProfileInfo;
             if (other != null)
-                return other.Name.Equals(this.Name);
+                return other.Name.Equals(Name);
             else if (obj is string)
                 return other.Name.Equals(obj.ToString());
             else
@@ -33,10 +33,10 @@ namespace BlockifyLib.BlockifyLib.Launcher
         }
 
         public override string ToString() =>
-            this.Type + " " + this.Name;
+            Type + " " + Name;
 
         public override int GetHashCode() =>
-            this.Name.GetHashCode();
+            Name.GetHashCode();
 
         public static ProfileInfo[] GetProfiles()
         {
@@ -103,17 +103,17 @@ namespace BlockifyLib.BlockifyLib.Launcher
         }
     }
 
-    public class Profile
+    public class Version
     {
         [Obsolete("Use 'FindProfile' Method.")]
-        public static Profile GetProfile(ProfileInfo[] infos, string name) =>
+        public static Version GetProfile(ProfileInfo[] infos, string name) =>
             FindProfile(infos, name);
 
-        static string n(string t) => (t == null) ? "" : t;
+        static string n(string t) => t == null ? "" : t;
 
-        static bool nc(string t) => (t == null) || (t == "");
+        static bool nc(string t) => t == null || t == "";
 
-        public static Profile Parse(ProfileInfo info)
+        public static Version Parse(ProfileInfo info)
         {
             string json;
             if (info.IsWeb)
@@ -123,7 +123,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
                 return ParseFromFile(info.Path);
         }
 
-        public static Profile ParseFromFile(string path) =>
+        public static Version ParseFromFile(string path) =>
             ParseFromJson(File.ReadAllText(path), false);
 
         private static string GetObject(JObject obj, string name) =>
@@ -157,9 +157,9 @@ namespace BlockifyLib.BlockifyLib.Launcher
             return strList.ToArray();
         }
 
-        private static Profile ParseFromJson(string json, bool writeProfile = true)
+        private static Version ParseFromJson(string json, bool writeProfile = true)
         {
-            Profile profile = new Profile();
+            Version profile = new Version();
             JObject job = JObject.Parse(json);
             profile.Id = GetObject(job, "id");
 
@@ -221,7 +221,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
             return profile;
         }
 
-        private static Profile inhert(Profile parent, Profile child)
+        private static Version inhert(Version parent, Version child)
         {
             if (nc(child.AssetId))
                 child.AssetId = parent.AssetId;
@@ -274,10 +274,10 @@ namespace BlockifyLib.BlockifyLib.Launcher
             return child;
         }
 
-        public static Profile FindProfile(ProfileInfo[] infos, string name)
+        public static Version FindProfile(ProfileInfo[] infos, string name)
         {
-            Profile startProfile = null;
-            Profile baseProfile = null;
+            Version startProfile = null;
+            Version baseProfile = null;
 
             foreach (ProfileInfo itemInfo in infos)
                 if (itemInfo.Name == name)

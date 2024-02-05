@@ -1,15 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
 
-namespace BlockifyLib.BlockifyLib.Launcher
+namespace BlockifyLib.Launcher
 {
-    public class Rule
+    public static class Rule
     {
         static Rule()
         {
@@ -37,7 +30,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
             }
         }
 
-        public bool CheckOSRequire(JArray arr)
+        public static bool CheckOSRequire(JArray arr)
         {
             bool require = true;
 
@@ -49,7 +42,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
                 foreach (var item in job)
                 {
                     if (item.Key == "action")           // action
-                        action = (item.Value.ToString() == "allow" ? true : false);
+                        action = item.Value.ToString() == "allow" ? true : false;
 
                     else if (item.Key == "os")          // os (containCurrentOS)
                         containCurrentOS = checkOSContains((JObject)item.Value);

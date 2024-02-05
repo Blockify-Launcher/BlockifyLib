@@ -1,4 +1,4 @@
-﻿namespace BlockifyLib.BlockifyLib.Launcher
+﻿namespace BlockifyLib.Launcher
 {
     public static class ProfileConverter
     {

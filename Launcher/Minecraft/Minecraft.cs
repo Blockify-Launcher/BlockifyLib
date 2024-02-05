@@ -1,6 +1,6 @@
 ﻿using System.IO;
 
-namespace BlockifyLib.BlockifyLib.Launcher.Minecraft
+namespace BlockifyLib.Launcher.Minecraft
 {
     public class Minecraft
     {

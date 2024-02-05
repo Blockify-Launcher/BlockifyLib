@@ -2,7 +2,7 @@
 using System.IO;
 using System.Net;
 
-namespace BlockifyLib.BlockifyLib.Launcher
+namespace BlockifyLib.Launcher
 {
     public class WebDownload
     {
@@ -39,7 +39,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
 
         private void ProgressChanged(long value, long max)
         {
-            float percentage = ((float)value / max) * 100;
+            float percentage = (float)value / max * 100;
             ProgressChangedEventArgs Process = new ProgressChangedEventArgs((int)percentage, null);
             ProgressChangedEvent?.Invoke(this, Process);
         }

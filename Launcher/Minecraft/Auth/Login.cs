@@ -3,7 +3,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 
-namespace BlockifyLib.BlockifyLib.Launcher.Minecraft
+namespace BlockifyLib.Launcher.Minecraft.Auth
 {
     public enum LoginResult
     {
@@ -297,5 +297,24 @@ namespace BlockifyLib.BlockifyLib.Launcher.Minecraft
                 return resp;
             }
         }
+    }
+
+    public class LoginResponse
+    {
+        public LoginResponse(LoginResult result, Session? session, string? errormsg, string? rawresponse)
+        {
+            Result = result;
+            Session = session;
+            ErrorMessage = errormsg;
+            RawResponse = rawresponse;
+        }
+
+        public LoginResult Result       { get; private set; }
+        public Session? Session         { get; private set; }
+        public string? ErrorMessage     { get; private set; }
+        public string? RawResponse      { get; private set; }
+
+        public bool IsSuccess => 
+            Result == LoginResult.Success;
     }
 }

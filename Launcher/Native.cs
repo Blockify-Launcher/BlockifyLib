@@ -1,14 +1,14 @@
-﻿using BlockifyLib.BlockifyLib.Launcher.src;
+﻿using BlockifyLib.Launcher.src;
 using Ionic.Zip;
 using System.IO;
 
-namespace BlockifyLib.BlockifyLib.Launcher
+namespace BlockifyLib.Launcher
 {
     public class Native
     {
         public Native(LaunchOption launchOption)
         {
-            this.LaunchOption = launchOption;
+            LaunchOption = launchOption;
         }
 
         public LaunchOption LaunchOption { get; private set; }
@@ -19,7 +19,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
             LaunchOption.StartProfile.NativePath = path;
         }
 
-        private string ExtractNatives(Profile profile)
+        private string ExtractNatives(Version profile)
         {
             var ran = new Random();
             int random = ran.Next(10000, 99999);
@@ -28,7 +28,7 @@ namespace BlockifyLib.BlockifyLib.Launcher
             return path;
         }
 
-        private void ExtractNatives(Profile profile, string path)
+        private void ExtractNatives(Version profile, string path)
         {
             Directory.CreateDirectory(path);
 

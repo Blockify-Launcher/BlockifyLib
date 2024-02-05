@@ -1,16 +1,27 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows7.0</TargetFramework>
     <Nullable>enable</Nullable>
     <UseWPF>true</UseWPF>
     <ImplicitUsings>enable</ImplicitUsings>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Title>BlockifyLib</Title>
+    <PackageProjectUrl>https://github.com/Blockify-Launcher/BlockifyLib</PackageProjectUrl>
+    <PackageIcon></PackageIcon>
+    <RepositoryUrl>https://github.com/Blockify-Launcher/BlockifyLib</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>minecraft; launcher; minecraft-launcher-lib</PackageTags>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Ionic.Zip" Version="1.9.1.8" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+    <PackageReference Include="SharpZipLib" Version="1.4.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Launcher\Version\Loading\" />
   </ItemGroup>
 
 </Project>
