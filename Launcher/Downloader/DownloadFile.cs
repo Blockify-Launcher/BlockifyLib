@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace BlockifyLib.Launcher.Downloader
+﻿namespace BlockifyLib.Launcher.Downloader
 {
     public enum LauncherFile
     {
@@ -19,11 +13,11 @@ namespace BlockifyLib.Launcher.Downloader
             this.Url = url;
         }
 
-        public LauncherFile Type    { get; set; }
-        public string? Name         { get; set; }
-        public string Path          { get; private set; }
-        public string Url           { get; private set; }
-        public long Size            { get; set; }
+        public TypeFile Type { get; set; }
+        public string? Name { get; set; }
+        public string Path { get; private set; }
+        public string Url { get; private set; }
+        public long Size { get; set; }
 
         public Func<Task>[]? AfterDownload { get; set; }
 

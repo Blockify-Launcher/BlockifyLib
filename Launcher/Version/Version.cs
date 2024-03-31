@@ -1,4 +1,5 @@
 ﻿using BlockifyLib.Launcher.src;
+using BlockifyLib.Launcher.Version.Func;
 
 namespace BlockifyLib.Launcher.Version
 {
@@ -76,8 +77,8 @@ namespace BlockifyLib.Launcher.Version
                     JvmArguments = vers.JvmArguments;
         }
 
-        public ProfileConverter.ProfileType Type { get; set; }
-            = ProfileConverter.ProfileType.Custom;
+        public ProfileConverter.VersionType Type { get; set; }
+            = ProfileConverter.VersionType.Custom;
 
         public Version(string id) =>
             this.id = id;

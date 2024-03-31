@@ -1,37 +1,37 @@
-﻿namespace BlockifyLib.Launcher
+﻿namespace BlockifyLib.Launcher.Version
 {
     public static class ProfileConverter
     {
-        public static ProfileType FromString(string val)
+        public static VersionType FromString(string val)
         {
             switch (val)
             {
                 case "release":
-                    return ProfileType.Release;
+                    return VersionType.Release;
                 case "snapshot":
-                    return ProfileType.Snapshot;
+                    return VersionType.Snapshot;
                 case "old_alpha":
-                    return ProfileType.OldAlpha;
+                    return VersionType.OldAlpha;
                 case "old_beta":
-                    return ProfileType.OldBeta;
+                    return VersionType.OldBeta;
                 default:
-                    return ProfileType.Custom;
+                    return VersionType.Custom;
             }
         }
 
-        public static string ToString(ProfileType type)
+        public static string ToString(VersionType type)
         {
             switch (type)
             {
-                case ProfileType.OldAlpha:
+                case VersionType.OldAlpha:
                     return "old_alpha";
-                case ProfileType.OldBeta:
+                case VersionType.OldBeta:
                     return "old_beta";
-                case ProfileType.Snapshot:
+                case VersionType.Snapshot:
                     return "snapshot";
-                case ProfileType.Release:
+                case VersionType.Release:
                     return "release";
-                case ProfileType.Custom:
+                case VersionType.Custom:
                 default:
                     return "unknown";
             }
@@ -40,15 +40,15 @@
         public static bool CheckOld(string val) =>
             CheckOld(FromString(val));
 
-        public static bool CheckOld(ProfileType t)
+        public static bool CheckOld(VersionType t)
         {
-            if (t == ProfileType.OldAlpha || t == ProfileType.OldBeta)
+            if (t == VersionType.OldAlpha || t == VersionType.OldBeta)
                 return true;
             else
                 return false;
         }
 
-        public enum ProfileType
+        public enum VersionType
         {
             OldAlpha,
             OldBeta,

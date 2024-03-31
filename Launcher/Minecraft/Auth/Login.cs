@@ -1,4 +1,7 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using BlockifyLib.Launcher.Minecraft.Mojang;
+using BlockifyLib.Launcher.Minecraft.Mojang.Launcher;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.IO;
 using System.Net;
 using System.Text;
@@ -8,105 +11,162 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
     public enum LoginResult
     {
         Success, BadRequest, WrongAccount,
-        NeedLogin, UnknownError
+        NeedLogin, UnknownError, NoProfile
     }
 
     public class Login
     {
-        public static readonly string DefaultLoginSessionFile =
-            Minecraft.DefaultPath + "\\logintoken.json";
+        public static readonly string DefaultLoginSessionFile = Path.Combine(MinecraftPath.GetOSDefaultPath(), "logintoken.json");
 
         public Login() : this(DefaultLoginSessionFile) { }
 
-        public Login(string tokenpath)
+        public Login(string sessionCacheFilePath)
         {
-            TokenFile = tokenpath;
+            SessionCacheFilePath = sessionCacheFilePath;
         }
 
-        public string TokenFile;
-        public bool SaveSession = true;
+        public string SessionCacheFilePath { get; private set; }
+        public bool SaveSession { get; set; } = true;
 
-        private void WriteLogin(Session result) =>
-            WriteLogin(result.Username, result.AccessToken, result.UUID, result.ClientToken);
+        private string CreateNewClientToken()
+        {
+            return Guid.NewGuid().ToString().Replace("-", "");
+        }
 
-        /* Save Login Session */
-        private void WriteLogin(string us, string se, string id, string ct)
+        private Session createNewSession()
+        {
+            var session = new Session();
+            if (SaveSession)
+            {
+                session.ClientToken = CreateNewClientToken();
+                writeSessionCache(session);
+            }
+            return session;
+        }
+
+        private void writeSessionCache(Session session)
         {
             if (!SaveSession) return;
+            var directoryPath = Path.GetDirectoryName(SessionCacheFilePath);
+            if (!string.IsNullOrEmpty(directoryPath))
+                Directory.CreateDirectory(directoryPath);
 
-            JObject jobj = new JObject() {
-                {"username", us},
-                {"session", se},
-                {"uuid", id },
-                {"clientToken", ct}
-            }; // create session json
-
-            Directory.CreateDirectory(Path.GetDirectoryName(TokenFile));
-            File.WriteAllText(TokenFile, jobj.ToString(), Encoding.UTF8);
+            var json = JsonConvert.SerializeObject(session);
+            File.WriteAllText(SessionCacheFilePath, json, Encoding.UTF8);
         }
 
-        public Session GetLocalToken()
+        public Session ReadSessionCache()
         {
-            Session session;
-
-            if (!File.Exists(TokenFile))
+            if (File.Exists(SessionCacheFilePath))
             {
-                var ClientToken = Guid.NewGuid().ToString().Replace("-", "");
+                var fileData = File.ReadAllText(SessionCacheFilePath, Encoding.UTF8);
+                try
+                {
+                    var session = JsonConvert.DeserializeObject<Session>(fileData, new JsonSerializerSettings
+                    {
+                        NullValueHandling = NullValueHandling.Ignore
+                    }) ?? new Session();
 
-                session = Session.createEmpty();
-                session.ClientToken = ClientToken;
+                    if (SaveSession && string.IsNullOrEmpty(session.ClientToken))
+                        session.ClientToken = CreateNewClientToken();
 
-                WriteLogin(session);
+                    return session;
+                }
+                catch (JsonReaderException) // invalid json
+                {
+                    return createNewSession();
+                }
             }
             else
             {
-                var filedata = File.ReadAllText(TokenFile, Encoding.UTF8);
-                try
-                {
-                    JObject job = JObject.Parse(filedata);
-                    session = new Session()
-                    {
-                        AccessToken = job["session"]?.ToString(),
-                        UUID = job["uuid"]?.ToString(),
-                        Username = job["username"]?.ToString(),
-                        ClientToken = job["clientToken"]?.ToString()
-                    };
-                }
-                catch (Newtonsoft.Json.JsonReaderException)
-                {
-                    DeleteTokenFile();
-                    session = GetLocalToken();
-                }
+                return createNewSession();
             }
-
-            return session;
         }
 
         private HttpWebResponse mojangRequest(string endpoint, string postdata)
         {
-            HttpWebRequest http = WebRequest.CreateHttp("https://authserver.mojang.com/" + endpoint);
+            HttpWebRequest http = WebRequest.CreateHttp(MojangServer.Auth + endpoint);
             http.ContentType = "application/json";
             http.Method = "POST";
-            using (StreamWriter req = new StreamWriter(http.GetRequestStream()))
-            {
-                req.Write(postdata);
-                req.Flush();
-            }
-            return http.GetResponseNoException();
+
+            using StreamWriter req = new StreamWriter(http.GetRequestStream());
+            req.Write(postdata);
+            req.Flush();
+
+            HttpWebResponse res = http.GetResponseNoException();
+            return res;
         }
 
-        public Session Authenticate(string id, string pw)
+        private LoginResponse parseSession(string json, string? clientToken)
         {
-            Session result = new Session();
+            var job = JObject.Parse(json); //json parse
 
-            string ClientToken = GetLocalToken().ClientToken;
+            var profile = job["selectedProfile"];
+            if (profile == null)
+                return new LoginResponse(LoginResult.NoProfile, null, null, json);
+            else
+            {
+                var session = new Session
+                {
+                    AccessToken = job["accessToken"]?.ToString(),
+                    UUID = profile["id"]?.ToString(),
+                    Username = profile["name"]?.ToString(),
+                    UserType = "Mojang",
+                    ClientToken = clientToken
+                };
 
-            JObject job = new JObject
+                writeSessionCache(session);
+                return new LoginResponse(LoginResult.Success, session, null, null);
+            }
+        }
+
+        private LoginResponse errorHandle(string json)
+        {
+            try
+            {
+                JObject job = JObject.Parse(json);
+
+                string error = job["error"]?.ToString() ?? ""; // error type
+                string errorMessage = job["message"]?.ToString() ?? ""; // detail error message
+                LoginResult result;
+
+                switch (error)
+                {
+                    case "Method Not Allowed":
+                    case "Not Found":
+                    case "Unsupported Media Type":
+                        result = LoginResult.BadRequest;
+                        break;
+                    case "IllegalArgumentException":
+                    case "ForbiddenOperationException":
+                        result = LoginResult.WrongAccount;
+                        break;
+                    default:
+                        result = LoginResult.UnknownError;
+                        break;
+                }
+
+                return new LoginResponse(result, null, errorMessage, json);
+            }
+            catch (Exception ex)
+            {
+                return new LoginResponse(LoginResult.UnknownError, null, ex.ToString(), json);
+            }
+        }
+
+        public LoginResponse Authenticate(string id, string pw)
+        {
+            string? clientToken = ReadSessionCache().ClientToken;
+            return Authenticate(id, pw, clientToken);
+        }
+
+        public LoginResponse Authenticate(string id, string pw, string? clientToken)
+        {
+            JObject req = new JObject
             {
                 { "username", id },
                 { "password", pw },
-                { "clientToken", ClientToken },
-
+                { "clientToken", clientToken },
                 { "agent", new JObject
                     {
                         { "name", "Minecraft" },
@@ -115,74 +175,80 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
                 }
             };
 
-            HttpWebResponse resHeader = mojangRequest("authenticate", job.ToString());
+            HttpWebResponse resHeader = mojangRequest("authenticate", req.ToString());
 
-            using (StreamReader res = new StreamReader(resHeader.GetResponseStream()))
+            var stream = resHeader.GetResponseStream();
+            if (stream == null)
+                return new LoginResponse(
+                    LoginResult.UnknownError,
+                    null,
+                    "null response stream",
+                    null);
+
+            using StreamReader res = new StreamReader(stream);
+            string rawResponse = res.ReadToEnd();
+            if (resHeader.StatusCode == HttpStatusCode.OK) // ResultCode == 200
+                return parseSession(rawResponse, clientToken);
+            else // fail to login
+                return errorHandle(rawResponse);
+        }
+
+        public LoginResponse TryAutoLogin()
+        {
+            Session session = ReadSessionCache();
+            return TryAutoLogin(session);
+        }
+
+        public LoginResponse TryAutoLogin(Session session)
+        {
+            try
             {
-                string Response = res.ReadToEnd();
-
-                result.ClientToken = ClientToken;
-
-                if (resHeader.StatusCode == HttpStatusCode.OK)
-                {
-                    JObject jObj = JObject.Parse(Response);
-                    result.AccessToken = jObj["accessToken"].ToString();
-                    result.UUID = jObj["selectedProfile"]["id"].ToString();
-                    result.Username = jObj["selectedProfile"]["name"].ToString();
-
-                    WriteLogin(result);
-                    result.Result = LoginResult.Success;
-                }
-                else
-                {
-                    var json = JObject.Parse(Response);
-
-                    var error = json["error"]?.ToString(); // error type
-                    result._RawResponse = Response;
-                    result.Message = json["message"]?.ToString() ?? ""; // detail error message
-
-                    switch (error)
-                    {
-                        case "Method Not Allowed":
-                        case "Not Found":
-                        case "Unsupported Media Type":
-                            result.Result = LoginResult.BadRequest;
-                            break;
-                        case "IllegalArgumentException":
-                        case "ForbiddenOperationException":
-                            result.Result = LoginResult.WrongAccount;
-                            break;
-                        default:
-                            result.Result = LoginResult.UnknownError;
-                            break;
-                    }
-                }
-
+                LoginResponse result = Validate(session);
+                if (result.Result != LoginResult.Success)
+                    result = Refresh(session);
                 return result;
+            }
+            catch (Exception ex)
+            {
+                return new LoginResponse(LoginResult.UnknownError, null, ex.ToString(), null);
             }
         }
 
-        public Session TryAutoLogin()
+        public LoginResponse TryAutoLoginFromMojangLauncher()
         {
-            Session result = Validate();
-            if (result.Result != LoginResult.Success)
-                result = Refresh();
+            var mojangAccounts = MojangLauncherAccounts.FromDefaultPath();
+            var activeAccount = mojangAccounts?.GetActiveAccount();
 
-            return result;
+            if (activeAccount == null)
+                return new LoginResponse(LoginResult.NeedLogin, null, null, null);
+
+            return TryAutoLogin(activeAccount.ToSession());
         }
 
-        public Session Refresh()
+        public LoginResponse TryAutoLoginFromMojangLauncher(string accountFilePath)
         {
-            Session result = new Session();
+            var mojangAccounts = MojangLauncherAccounts.FromFile(accountFilePath);
+            var activeAccount = mojangAccounts?.GetActiveAccount();
 
-            try
-            {
-                Session session = GetLocalToken();
-                JObject req = new JObject
+            if (activeAccount == null)
+                return new LoginResponse(LoginResult.NeedLogin, null, null, null);
+
+            return TryAutoLogin(activeAccount.ToSession());
+        }
+
+        public LoginResponse Refresh()
+        {
+            Session session = ReadSessionCache();
+            return Refresh(session);
+        }
+
+        public LoginResponse Refresh(Session session)
+        {
+            JObject req = new JObject
                 {
                     { "accessToken", session.AccessToken },
                     { "clientToken", session.ClientToken },
-                    { "selectedProfile", new JObject()
+                    { "selectedProfile", new JObject
                         {
                             { "id", session.UUID },
                             { "name", session.Username }
@@ -190,82 +256,67 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
                     }
                 };
 
-                HttpWebResponse resHeader = mojangRequest("refresh", req.ToString());
-                using (StreamReader res = new StreamReader(resHeader.GetResponseStream()))
-                {
-                    string response = res.ReadToEnd();
-                    result._RawResponse = response;
-                    JObject job = JObject.Parse(response);
+            HttpWebResponse resHeader = mojangRequest("refresh", req.ToString());
+            var stream = resHeader.GetResponseStream();
+            if (stream == null)
+                return new LoginResponse(
+                    LoginResult.UnknownError,
+                    null,
+                    "null response stream",
+                    null);
 
-                    result.AccessToken = job["accessToken"].ToString();
-                    result.AccessToken = job["accessToken"].ToString();
-                    result.UUID = job["selectedProfile"]["id"].ToString();
-                    result.Username = job["selectedProfile"]["name"].ToString();
-                    result.ClientToken = session.ClientToken;
+            using StreamReader res = new StreamReader(stream);
+            string rawResponse = res.ReadToEnd();
 
-                    WriteLogin(result);
-                    result.Result = LoginResult.Success;
-                }
-            }
-            catch
-            {
-                result.Result = LoginResult.UnknownError;
-            }
-
-            return result;
+            if ((int)resHeader.StatusCode / 100 == 2)
+                return parseSession(rawResponse, session.ClientToken);
+            else
+                return errorHandle(rawResponse);
         }
 
-        public Session Validate()
+        public LoginResponse Validate()
         {
-            Session result = new Session();
-            try
-            {
-                Session session = GetLocalToken();
-                JObject job = new JObject
+            Session session = ReadSessionCache();
+            return Validate(session);
+        }
+
+        public LoginResponse Validate(Session session)
+        {
+            JObject req = new JObject
                 {
                     { "accessToken", session.AccessToken },
                     { "clientToken", session.ClientToken }
                 };
 
-                HttpWebResponse resHeader = mojangRequest("validate", job.ToString());
-                using (StreamReader res = new StreamReader(resHeader.GetResponseStream()))
-                    if (resHeader.StatusCode == HttpStatusCode.NoContent) // StatusCode == 204
-                    {
-                        result.Result = LoginResult.Success;
-                        result.AccessToken = session.AccessToken;
-                        result.UUID = session.UUID;
-                        result.Username = session.Username;
-                        result.ClientToken = session.ClientToken;
-                    }
-                    else
-                        result.Result = LoginResult.NeedLogin;
-            }
-            catch
-            {
-                result.Result = LoginResult.UnknownError;
-            }
-
-            return result;
+            HttpWebResponse resHeader = mojangRequest("validate", req.ToString());
+            if (resHeader.StatusCode == HttpStatusCode.NoContent) // StatusCode == 204
+                return new LoginResponse(LoginResult.Success, session, null, null);
+            else
+                return new LoginResponse(LoginResult.NeedLogin, null, null, null);
         }
 
         public void DeleteTokenFile()
         {
-            if (File.Exists(TokenFile))
-                File.Delete(TokenFile);
+            if (File.Exists(SessionCacheFilePath))
+                File.Delete(SessionCacheFilePath);
         }
 
         public bool Invalidate()
         {
-            Session session = GetLocalToken();
+            Session session = ReadSessionCache();
+            return Invalidate(session);
+        }
 
+        public bool Invalidate(Session session)
+        {
             JObject job = new JObject
             {
                 { "accessToken", session.AccessToken },
                 { "clientToken", session.ClientToken }
             };
 
-            return mojangRequest("invalidate", job.ToString())
-                .StatusCode == HttpStatusCode.OK;
+            HttpWebResponse res = mojangRequest("invalidate", job.ToString());
+            return res.StatusCode == HttpStatusCode.NoContent; // 204
         }
 
         public bool Signout(string id, string pw)
@@ -276,12 +327,12 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
                 { "password", pw }
             };
 
-            return mojangRequest("signout", job.ToString())
-                .StatusCode == HttpStatusCode.NoContent;
+            HttpWebResponse res = mojangRequest("signout", job.ToString());
+            return res.StatusCode == HttpStatusCode.NoContent; // 204
         }
     }
 
-    public static class HttpWebResponseExt
+    internal static class HttpWebResponseExt
     {
         public static HttpWebResponse GetResponseNoException(this HttpWebRequest req)
         {
@@ -291,7 +342,7 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
             }
             catch (WebException we)
             {
-                HttpWebResponse resp = we.Response as HttpWebResponse;
+                HttpWebResponse? resp = we.Response as HttpWebResponse;
                 if (resp == null)
                     throw;
                 return resp;
@@ -309,12 +360,11 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
             RawResponse = rawresponse;
         }
 
-        public LoginResult Result       { get; private set; }
-        public Session? Session         { get; private set; }
-        public string? ErrorMessage     { get; private set; }
-        public string? RawResponse      { get; private set; }
+        public LoginResult Result { get; private set; }
+        public Session? Session { get; private set; }
+        public string? ErrorMessage { get; private set; }
+        public string? RawResponse { get; private set; }
 
-        public bool IsSuccess => 
-            Result == LoginResult.Success;
+        public bool IsSuccess => Result == LoginResult.Success;
     }
 }

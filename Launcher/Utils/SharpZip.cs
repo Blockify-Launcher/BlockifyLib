@@ -1,5 +1,5 @@
-﻿using ICSharpCode.SharpZipLib.Zip;
-using System;
+﻿
+using ICSharpCode.SharpZipLib.Zip;
 using System.IO;
 
 namespace BlockifyLib.Launcher.Utils

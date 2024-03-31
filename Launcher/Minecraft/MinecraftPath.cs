@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using BlockifyLib.Launcher.Utils;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace BlockifyLib.Launcher.Minecraft
 {
@@ -29,15 +25,9 @@ namespace BlockifyLib.Launcher.Minecraft
             }
         }
 
-        public MinecraftPath() : this(GetOSDefaultPath())
-        {
+        public MinecraftPath() : this(GetOSDefaultPath()) { }
 
-        }
-
-        public MinecraftPath(string basePath) : this(basePath, basePath)
-        {
-
-        }
+        public MinecraftPath(string basePath) : this(basePath, basePath) { }
 
         public MinecraftPath(string basePath, string basePathForAssets)
         {
@@ -91,10 +81,8 @@ namespace BlockifyLib.Launcher.Minecraft
         public virtual string GetNativePath(string id)
             => NormalizePath($"{Versions}/{id}/natives");
 
-        public override string ToString()
-        {
-            return BasePath;
-        }
+        public override string ToString() =>
+            BasePath;
 
         protected static string Dir(string path)
         {
@@ -105,9 +93,7 @@ namespace BlockifyLib.Launcher.Minecraft
             return p;
         }
 
-        protected static string NormalizePath(string path)
-        {
-            return IOUtil.NormalizePath(path);
-        }
+        protected static string NormalizePath(string path) =>
+            IOUtil.NormalizePath(path);
     }
 }

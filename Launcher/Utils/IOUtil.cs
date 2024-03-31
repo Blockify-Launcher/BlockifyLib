@@ -1,8 +1,5 @@
-﻿using System;
-using System.IO;
-using System.Linq;
+﻿using System.IO;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace BlockifyLib.Launcher.Utils
 {
@@ -16,7 +13,7 @@ namespace BlockifyLib.Launcher.Utils
                 .Replace(Path.AltDirectorySeparatorChar, Path.DirectorySeparatorChar)
                 .TrimEnd(Path.DirectorySeparatorChar);
         }
-        
+
         public static void DeleteDirectory(string targetDir)
         {
             try
@@ -92,7 +89,7 @@ namespace BlockifyLib.Launcher.Utils
         {
             if (string.IsNullOrEmpty(compareHash))
                 return true;
-            
+
             try
             {
                 string fileHash;
@@ -141,7 +138,7 @@ namespace BlockifyLib.Launcher.Utils
         }
 
         #region Async File IO
-        
+
         public static FileStream AsyncReadStream(string path)
         {
             FileStream stream = new FileStream(
@@ -150,7 +147,7 @@ namespace BlockifyLib.Launcher.Utils
 
             return stream;
         }
-        
+
         public static FileStream AsyncWriteStream(string path, bool append)
         {
             FileStream stream = new FileStream(
@@ -159,7 +156,7 @@ namespace BlockifyLib.Launcher.Utils
 
             return stream;
         }
-        
+
         public static StreamReader AsyncStreamReader(string path, Encoding encoding)
         {
             FileStream stream = AsyncReadStream(path);
@@ -188,14 +185,14 @@ namespace BlockifyLib.Launcher.Utils
             await writer.WriteAsync(content).ConfigureAwait(false);
             await writer.FlushAsync().ConfigureAwait(false);
         }
-        
+
         public static async Task CopyFileAsync(string sourceFile, string destinationFile)
         {
             using var sourceStream = AsyncReadStream(sourceFile);
             using var destinationStream = AsyncWriteStream(destinationFile, false);
-            
+
             await sourceStream.CopyToAsync(destinationStream).ConfigureAwait(false);
-        
+
             await destinationStream.FlushAsync().ConfigureAwait(false);
         }
 

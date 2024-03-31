@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
+using System;
 using System.IO;
-using static BlockifyLib.Launcher.Library;
 
 namespace BlockifyLib.Launcher.Version.Func
 {
@@ -22,39 +22,50 @@ namespace BlockifyLib.Launcher.Version.Func
         private static string GetObject(JObject obj, string name) =>
             obj[name]?.ToString();
 
-        private static Version ParseFromJson(string json, bool writeProfile = true)
+        public static Version ParseFromJson(string json, bool writeProfile = true)
         {
             try
             {
-                JObject job = JObject.Parse(json);
+                var job = JObject.Parse(json);
 
-                if (string.IsNullOrEmpty(GetObject(job, "id")))
+                // id
+                var id = job["id"]?.ToString();
+                if (string.IsNullOrEmpty(id))
                     throw new ParseException("Empty version id");
-                Version version = new Version(GetObject(job, "id"));
+
+                var version = new Version(id);
+
+                // javaVersion
                 version.JavaVersion = job["javaVersion"]?["component"]?.ToString();
 
-                if (job["assetIndex"] != null)
+                // assets
+                var assetindex = job["assetIndex"];
+                var assets = job["assets"];
+                if (assetindex != null)
                 {
-                    version.AssetId = GetObject((JObject)job["assetIndex"], "id");
-                    version.AssetUrl = GetObject((JObject)job["assetIndex"], "url");
-                    version.AssetHash = GetObject((JObject)job["assetIndex"], "shal");
+                    version.AssetId = assetindex["id"]?.ToString();
+                    version.AssetUrl = assetindex["url"]?.ToString();
+                    version.AssetHash = assetindex["sha1"]?.ToString();
                 }
-                else if (job["assets"] != null)
-                    version.AssetId = job["assets"].ToString();
+                else if (assets != null)
+                    version.AssetId = assets.ToString();
 
-                if (job["downloads"]?["client"] != null)
+                // client jar
+                var client = job["downloads"]?["client"];
+                if (client != null)
                 {
-                    version.ClientDownloadUrl = GetObject((JObject)job["downloads"]?["client"], "url");
-                    version.ClientHash = GetObject((JObject)job["downloads"]?["client"], "shal");
+                    version.ClientDownloadUrl = client["url"]?.ToString();
+                    version.ClientHash = client["sha1"]?.ToString();
                 }
 
+                // libraries
                 if (job["libraries"] is JArray libJArr)
                 {
-                    List<Library> libList = new List<Library>(libJArr.Count);
-                    Parser libParser = new Parser();
-                    foreach (JObject item in libJArr)
+                    var libList = new List<Library>(libJArr.Count);
+                    var libParser = new LibraryParse();
+                    foreach (var item in libJArr)
                     {
-                        var libs = Library.Parser.ParseJson(item);
+                        var libs = libParser.ParseJsonObject((JObject)item);
                         if (libs != null)
                             libList.AddRange(libs);
                     }
@@ -62,7 +73,10 @@ namespace BlockifyLib.Launcher.Version.Func
                     version.Libraries = libList.ToArray();
                 }
 
+                // mainClass
                 version.MainClass = job["mainClass"]?.ToString();
+
+                // argument
                 version.MinecraftArguments = job["minecraftArguments"]?.ToString();
 
                 var ag = job["arguments"];
@@ -74,12 +88,14 @@ namespace BlockifyLib.Launcher.Version.Func
                         version.JvmArguments = argParse(jvmArg);
                 }
 
+                // metadata
                 version.ReleaseTime = job["releaseTime"]?.ToString();
 
                 var type = job["type"]?.ToString();
                 version.TypeStr = type;
                 version.Type = ProfileConverter.FromString(type);
 
+                // inherits
                 if (job["inheritsFrom"] != null)
                 {
                     version.IsInherited = true;
@@ -90,13 +106,14 @@ namespace BlockifyLib.Launcher.Version.Func
                 if (string.IsNullOrEmpty(version.Jar))
                     version.Jar = version.id;
 
+                // logging
                 var loggingClient = job["logging"]?["client"];
                 if (loggingClient != null)
                 {
                     version.LoggingClient = new src.LogConfig
                     {
                         Id = loggingClient["file"]?["id"]?.ToString(),
-                        Shal = loggingClient["file"]?["sha1"]?.ToString(),
+                        Sha1 = loggingClient["file"]?["sha1"]?.ToString(),
                         Size = loggingClient["file"]?["size"]?.ToString(),
                         Url = loggingClient["file"]?["url"]?.ToString(),
                         Type = loggingClient["type"]?.ToString(),

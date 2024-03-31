@@ -1,8 +1,8 @@
-﻿using BlockifyLib.Launcher.Version.Func;
-using BlockifyLib.Launcher.Minecraft;
+﻿using BlockifyLib.Launcher.Minecraft;
 using BlockifyLib.Launcher.Utils;
 using Newtonsoft.Json;
 using System.IO;
+using System.Net;
 
 namespace BlockifyLib.Launcher.Version.Metadata
 {
@@ -18,7 +18,7 @@ namespace BlockifyLib.Launcher.Version.Metadata
         protected VersionMetadata(string id) =>
             this.Name = id;
 
-        public ProfileConverter.ProfileType ProfType { get; set; }
+        public ProfileConverter.VersionType ProfType { get; set; }
 
         public DateTime? ReleaseTime
         {
@@ -105,7 +105,7 @@ namespace BlockifyLib.Launcher.Version.Metadata
                 else
                     await SaveMetadataAsync(Json, savePath)
                         .ConfigureAwait(false);
-            return parse ? Parser.ParseFromJson(Json) : null;// TODO : create Version Parser
+            return parse ? Func.VersionParser.ParseFromJson(Json) : null;
         }
 
         public override Version GetVersion()
@@ -127,4 +127,48 @@ namespace BlockifyLib.Launcher.Version.Metadata
             => getAsync(path, false, false);
     }
 
+    public class LocalVersion : StrMeta
+    {
+        public LocalVersion(string id) : base(id)
+        {
+            IsLocalVersion = true;
+        }
+
+        protected override string ReadMetadata()
+        {
+            if (string.IsNullOrEmpty(Path))
+                throw new InvalidOperationException("Path property was null");
+            return File.ReadAllText(Path);
+        }
+
+        protected override Task<string> ReadMetadataAsync()
+        {
+            if (string.IsNullOrEmpty(Path))
+                throw new InvalidOperationException("Path property was null");
+            return IOUtil.ReadFileAsync(Path);
+        }
+    }
+
+    public class WebVersion : StrMeta
+    {
+        public WebVersion(string id) : base(id)
+        {
+            IsLocalVersion = false;
+        }
+
+        protected override string ReadMetadata()
+        {
+            if (string.IsNullOrEmpty(Path))
+                throw new InvalidOperationException("Path property was null");
+            return new WebClient().DownloadString(Path);
+        }
+
+        protected override async Task<string> ReadMetadataAsync()
+        {
+            if (string.IsNullOrEmpty(Path))
+                throw new InvalidOperationException("Path property was null");
+            return await new WebClient().DownloadStringTaskAsync(Path)
+                .ConfigureAwait(false);
+        }
+    }
 }

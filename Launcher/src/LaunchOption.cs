@@ -1,51 +1,39 @@
-﻿using BlockifyLib.Launcher;
+﻿using BlockifyLib.Launcher.Minecraft;
 using BlockifyLib.Launcher.Minecraft.Auth;
 
 namespace BlockifyLib.Launcher.src
 {
     public class LaunchOption
     {
-        public string JavaPath { get; set; } = "";
+        public MinecraftPath? Path { get; set; }
+        public Version.Version? StartVersion { get; set; }
+        public Session? Session { get; set; }
+
+        public string? JavaVersion { get; set; }
+        public string? JavaPath { get; set; }
         public int MaximumRamMb { get; set; } = 1024;
-        public Version StartProfile { get; set; } = null;
-        public Session Session { get; set; } = null;
-        public string LauncherName { get; set; } = "";
-        public string ServerIp { get; set; } = "";
-        public string CustomJavaParameter { get; set; } = "";
+        public int MinimumRamMb { get; set; }
+        public string[]? JVMArguments { get; set; }
 
-        public int ScreenWidth { get; set; } = 0;
-        public int ScreenHeight { get; set; } = 0;
+        public string? DockName { get; set; }
+        public string? DockIcon { get; set; }
 
-        internal void CheckValid()
-        {
-            var exMsg = "";
+        public string? ServerIp { get; set; }
+        public int ServerPort { get; set; } = 25565;
 
-            if (MaximumRamMb < 1)
-                exMsg = "MaximumRamMb is too small.";
+        public int ScreenWidth { get; set; }
+        public int ScreenHeight { get; set; }
+        public bool FullScreen { get; set; }
 
-            if (StartProfile == null)
-                exMsg = "StartProfile is null";
+        public string? ClientId { get; set; }
+        public string? VersionType { get; set; }
+        public string? GameLauncherName { get; set; }
+        public string? GameLauncherVersion { get; set; }
 
-            if (Session == null)
-                exMsg = "Session is null";
-
-            if (LauncherName == null)
-                LauncherName = "";
-
-            else if (LauncherName.Contains(" "))
-                exMsg = "Launcher Name must not contains Space.";
-
-            if (ServerIp == null)
-                ServerIp = "";
-
-            if (CustomJavaParameter == null)
-                CustomJavaParameter = "";
-
-            if (ScreenWidth < 0 || ScreenHeight < 0)
-                exMsg = "Screen Size must be greater than or equal to zero.";
-
-            if (exMsg != "")
-                throw new ArgumentException(exMsg);
-        }
+        internal MinecraftPath GetMinecraftPath() => Path!;
+        internal Version.Version GetStartVersion() => StartVersion!;
+        internal Session GetSession() => Session!;
+        internal string GetJavaPath() => JavaPath!;
     }
+
 }

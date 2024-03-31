@@ -1,41 +1,69 @@
-﻿namespace BlockifyLib.Launcher.Minecraft.Auth
+﻿using Newtonsoft.Json;
+using System.Security.RightsManagement;
+
+namespace BlockifyLib.Launcher.Minecraft.Auth
 {
-    public class Session
+    public enum UserType
     {
-        public string Username { get; internal set; }
-        public string AccessToken { get; internal set; }
-        public string UUID { get; internal set; }
-        public string ClientToken { get; internal set; }
+        Mojang,
+        Microsoft, 
+        Offline
+    }
 
-        public LoginResult Result { get; internal set; }
-        public string Message { get; internal set; }
+    public class SessionStruct
+    {
+        [JsonProperty("username")]
+        public string? Username { get; set; }
+        [JsonProperty("session")]
+        public string? AccessToken { get; set; }
+        [JsonProperty("uuid")]
+        public string? UUID { get; set; }
+        [JsonProperty("clientToken")]
+        public string? ClientToken { get; set; }
+        public string? Xuid { get; set; }
+        public string? UserType { get; set; }
+    }
 
-        public string _RawResponse { get; internal set; }
+    public class Session : SessionStruct
+    {
+        public Session() { }
+
+        public Session(string? username, string? accessToken, string? uuid)
+        {
+            Username = username;
+            AccessToken = accessToken;
+            UUID = uuid;
+        }
+
+        public bool CheckIsValid()
+        {
+            return !string.IsNullOrEmpty(Username)
+                && !string.IsNullOrEmpty(AccessToken)
+                && !string.IsNullOrEmpty(UUID);
+        }
 
         public static Session GetOfflineSession(string username)
         {
-            Session login = new Session()
+            return new Session
             {
                 Username = username,
                 AccessToken = "access_token",
                 UUID = "user_uuid",
-                Result = LoginResult.Success,
-                Message = "",
-                ClientToken = ""
+                UserType = "Mojang",
+                ClientToken = null
             };
-            return login;
         }
 
-        internal static Session createEmpty()
+        public static Session CreateOfflineSession(string username)
         {
-            Session session = new Session()
+            return new Session
             {
-                Username = "",
-                AccessToken = "",
-                UUID = "",
-                ClientToken = ""
+                Username = username,
+                AccessToken = "access_token",
+                UUID = Guid.NewGuid().ToString().Replace("-", ""),
+                UserType = "msa",
+                ClientToken = null
             };
-            return session;
         }
     }
 }

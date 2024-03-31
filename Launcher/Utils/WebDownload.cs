@@ -1,8 +1,7 @@
-﻿using System;
+﻿using BlockifyLib.Launcher.Downloader;
 using System.ComponentModel;
 using System.IO;
 using System.Net;
-using System.Threading.Tasks;
 
 namespace BlockifyLib.Launcher.Utils
 {
@@ -28,37 +27,35 @@ namespace BlockifyLib.Launcher.Utils
                 return w;
             }
         }
-        
-        private static readonly int DefaultBufferSize = 1024 * 64; // 64kb
+
+        private static readonly int DefaultBufferSize = 1024 * 64;
         private readonly object locker = new object();
-        
+
         internal event EventHandler<DownloadFileProgress>? FileDownloadProgressChanged;
         internal event ProgressChangedEventHandler? DownloadProgressChangedEvent;
 
         internal void DownloadFile(string url, string path)
         {
-            var req = WebRequest.CreateHttp(url); // Request
-            var response = req.GetResponse();
-            var filesize = long.Parse(response.Headers.Get("Content-Length") ?? "0"); // Get File Length
+            WebResponse response = WebRequest.CreateHttp(url).GetResponse();
+            long filesize = long.Parse(response.Headers.Get("Content-Length") ?? "0");
 
-            var webStream = response.GetResponseStream(); // Get NetworkStream
+            Stream webStream = response.GetResponseStream();
             if (webStream == null)
                 throw new NullReferenceException(nameof(webStream));
-            
-            var fileStream = File.Open(path, FileMode.Create); // Open FileStream
 
-            var bufferSize = DefaultBufferSize; // Make buffer
-            var buffer = new byte[bufferSize];
+            FileStream fileStream = File.Open(path, FileMode.Create);
+
+            int bufferSize = DefaultBufferSize;
+            byte[] buffer = new byte[bufferSize];
             int length;
 
-            var fireEvent = filesize > DefaultBufferSize;
-            var processedBytes = 0;
+            bool fireEvent = filesize > DefaultBufferSize;
+            int processedBytes = 0;
 
-            while ((length = webStream.Read(buffer, 0, bufferSize)) > 0) // read to end and write file
+            while ((length = webStream.Read(buffer, 0, bufferSize)) > 0)
             {
                 fileStream.Write(buffer, 0, length);
 
-                // raise event
                 if (fireEvent)
                 {
                     processedBytes += length;
@@ -66,7 +63,7 @@ namespace BlockifyLib.Launcher.Utils
                 }
             }
 
-            webStream.Dispose(); // Close streams
+            webStream.Dispose();
             fileStream.Dispose();
         }
 
@@ -75,7 +72,7 @@ namespace BlockifyLib.Launcher.Utils
             string? directoryName = Path.GetDirectoryName(file.Path);
             if (!string.IsNullOrEmpty(directoryName))
                 Directory.CreateDirectory(directoryName);
-            
+
             using (var wc = new TimeoutWebClient())
             {
                 long lastBytes = 0;
@@ -84,13 +81,13 @@ namespace BlockifyLib.Launcher.Utils
                 {
                     lock (locker)
                     {
-                        var progressedBytes = e.BytesReceived - lastBytes;
+                        long progressedBytes = e.BytesReceived - lastBytes;
                         if (progressedBytes < 0)
                             return;
 
                         lastBytes = e.BytesReceived;
 
-                        var progress = new DownloadFileProgress(
+                        DownloadFileProgress progress = new DownloadFileProgress(
                             file, e.TotalBytesToReceive, progressedBytes, e.BytesReceived, e.ProgressPercentage);
                         FileDownloadProgressChanged?.Invoke(this, progress);
                     }
@@ -106,27 +103,23 @@ namespace BlockifyLib.Launcher.Utils
             if (!string.IsNullOrEmpty(directoryName))
                 Directory.CreateDirectory(directoryName);
 
-            var req = WebRequest.CreateHttp(url);
+            HttpWebRequest req = WebRequest.CreateHttp(url);
             req.Method = "GET";
             req.Timeout = 5000;
             req.ReadWriteTimeout = 5000;
             req.ContinueTimeout = 5000;
-            var res = req.GetResponse();
+            WebResponse res = req.GetResponse();
 
             using var httpStream = res.GetResponseStream();
             if (httpStream == null)
                 return;
-            
+
             using var fs = File.OpenWrite(path);
             httpStream.CopyTo(fs);
         }
 
-        private void progressChanged(long value, long max)
-        {
-            var percentage = (float)value / max * 100;
-
-            var e = new ProgressChangedEventArgs((int)percentage, null);
-            DownloadProgressChangedEvent?.Invoke(this, e);
-        }
+        private void progressChanged(long value, long max) =>
+            DownloadProgressChangedEvent?.Invoke(this,
+                new ProgressChangedEventArgs((int)((float)value / max * 100), null));
     }
 }

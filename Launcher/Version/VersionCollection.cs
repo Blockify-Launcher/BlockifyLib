@@ -1,24 +1,17 @@
 ﻿using BlockifyLib.Launcher.Minecraft;
-using BlockifyLib.Launcher.Version.Metadata;
-using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Xml.Linq;
 
 namespace BlockifyLib.Launcher.Version
 {
     public class VersionCollection : IEnumerable<Metadata.VersionMetadata>
     {
-        public VersionCollection(VersionCollection[] datas)
+        public VersionCollection(Metadata.VersionMetadata[] datas)
             : this(datas, null, null, null)
         { }
 
-        public VersionCollection(VersionCollection[] datas, MinecraftPath originalPath)
+        public VersionCollection(Metadata.VersionMetadata[] datas, MinecraftPath originalPath)
             : this(datas, originalPath, null, null)
         { }
 
@@ -47,10 +40,10 @@ namespace BlockifyLib.Launcher.Version
             LatestSnapshotVersion = latestSnapshot;
         }
 
-        public Metadata.VersionMetadata this[int index] => 
+        public Metadata.VersionMetadata this[int index] =>
             (Metadata.VersionMetadata)Versions[index]!;
 
-        public Metadata.VersionMetadata GetVersionMetadata(nameof(name))
+        public Metadata.VersionMetadata GetVersionMetadata(string name)
         {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
@@ -61,28 +54,21 @@ namespace BlockifyLib.Launcher.Version
             return versionMetadata;
         }
 
-        public Metadata.VersionMetadata[] ToArray(VersionMetadata option)
-        {
-            var sorter = new VersionMetadataSorter(option);
-            return sorter.Sort(this);
-        }
+        public Metadata.VersionMetadata[] ToArray(Func.SortVersionOption option) =>
+            new Func.SortVersionMetadata(option).Sort(this);
 
         public virtual Version GetVersion(string name)
         {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
-
-            var versionMetadata = GetVersionMetadata(name);
-            return GetVersion(versionMetadata);
+            return GetVersion(GetVersionMetadata(name));
         }
 
-        public virtual Task<MVersion> GetVersionAsync(string name)
+        public virtual Task<Version> GetVersionAsync(string name)
         {
             if (name == null)
                 throw new ArgumentNullException(nameof(name));
-
-            var versionMetadata = GetVersionMetadata(name);
-            return GetVersionAsync(versionMetadata);
+            return GetVersionAsync(GetVersionMetadata(name));
         }
 
         public virtual Version GetVersion(Metadata.VersionMetadata versionMetadata)
@@ -90,22 +76,15 @@ namespace BlockifyLib.Launcher.Version
             if (versionMetadata == null)
                 throw new ArgumentNullException(nameof(versionMetadata));
 
-            Version startVersion;
-            if (MinecraftPath == null)
-                startVersion = versionMetadata.GetVersion();
-            else
-                startVersion = versionMetadata.GetVersion(MinecraftPath);
+            Version startVersion = MinecraftPath == null ? versionMetadata.GetVersion() :
+                versionMetadata.GetVersion(MinecraftPath);
 
             if (startVersion.IsInherited && !string.IsNullOrEmpty(startVersion.ParentVersionId))
             {
-                if (startVersion.ParentVersionId == startVersion.Id) // prevent StackOverFlowException
-                    throw new InvalidDataException(
-                        "Invalid version json file : inheritFrom property is equal to id property.");
-
-                var baseVersion = GetVersion(startVersion.ParentVersionId);
-                startVersion.InheritFrom(baseVersion);
+                if (startVersion.ParentVersionId == startVersion.id)
+                    throw new InvalidDataException("Invalid version json file");
+                startVersion.InheritFrom(GetVersion(startVersion.ParentVersionId));
             }
-
             return startVersion;
         }
 
@@ -114,51 +93,38 @@ namespace BlockifyLib.Launcher.Version
             if (versionMetadata == null)
                 throw new ArgumentNullException(nameof(versionMetadata));
 
-            Version startVersion;
-            if (MinecraftPath == null)
-                startVersion = await versionMetadata.GetVersionAsync()
-                    .ConfigureAwait(false);
-            else
-                startVersion = await versionMetadata.GetVersionAsync(MinecraftPath)
-                    .ConfigureAwait(false);
+            Version startVersion = MinecraftPath == null ? await versionMetadata.GetVersionAsync().ConfigureAwait(false) :
+                await versionMetadata.GetVersionAsync(MinecraftPath).ConfigureAwait(false);
 
             if (startVersion.IsInherited && !string.IsNullOrEmpty(startVersion.ParentVersionId))
             {
-                if (startVersion.ParentVersionId == startVersion.Id) // prevent StackOverFlowException
-                    throw new InvalidDataException(
-                        "Invalid version json file : inheritFrom property is equal to id property.");
-
-                var baseVersion = await GetVersionAsync(startVersion.ParentVersionId)
-                    .ConfigureAwait(false);
-                startVersion.InheritFrom(baseVersion);
+                if (startVersion.ParentVersionId == startVersion.id)
+                    throw new InvalidDataException("Invalid version json file");
+                startVersion.InheritFrom(await GetVersionAsync(startVersion.ParentVersionId)
+                    .ConfigureAwait(false));
             }
-
             return startVersion;
         }
 
-        public void AddVersion(Metadata.VersionMetadata version)
-        {
+        public void AddVersion(Metadata.VersionMetadata version) =>
             Versions[version.Name] = version;
-        }
 
-        public bool Contains(string? versionName)
-            => !string.IsNullOrEmpty(versionName) && Versions.Contains(versionName);
+        public bool Contains(string? versionName) =>
+            !string.IsNullOrEmpty(versionName) && Versions.Contains(versionName);
 
         public virtual void Merge(VersionCollection from)
         {
             foreach (var item in from)
             {
-                var version = (Metadata.VersionMetadata?)Versions[item.Name];
+                Metadata.VersionMetadata? version = Versions[item.Name] as Metadata.VersionMetadata;
                 if (version == null)
-                {
                     Versions[item.Name] = item;
-                }
                 else
                 {
                     if (string.IsNullOrEmpty(version.Type))
                     {
                         version.Type = item.Type;
-                        version.Type = VersionTypeConverter.FromString(item.Type);
+                        version.ProfType = ProfileConverter.FromString(item.Type);
                     }
 
                     if (string.IsNullOrEmpty(version.ReleaseTimeStr))
@@ -182,11 +148,7 @@ namespace BlockifyLib.Launcher.Version
             {
                 if (!item.HasValue)
                     continue;
-
-                var entry = item.Value;
-
-                var version = (Metadata.VersionMetadata)entry.Value!;
-                yield return version;
+                yield return (Metadata.VersionMetadata)item.Value.Value!;
             }
         }
 
@@ -196,10 +158,8 @@ namespace BlockifyLib.Launcher.Version
             {
                 if (!item.HasValue)
                     continue;
-
                 yield return item.Value;
             }
         }
     }
-}
 }

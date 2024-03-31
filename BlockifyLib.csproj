@@ -12,16 +12,13 @@
     <RepositoryUrl>https://github.com/Blockify-Launcher/BlockifyLib</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>minecraft; launcher; minecraft-launcher-lib</PackageTags>
+    <Version>1.0.3</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Ionic.Zip" Version="1.9.1.8" />
+    <PackageReference Include="LZMA-SDK" Version="22.1.1" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="SharpZipLib" Version="1.4.2" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Launcher\Version\Loading\" />
   </ItemGroup>
 
 </Project>

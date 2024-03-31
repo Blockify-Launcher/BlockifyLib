@@ -1,5 +1,4 @@
-﻿using System;
-using System.IO;
+﻿using System.IO;
 
 namespace BlockifyLib.Launcher.Utils
 {
@@ -16,13 +15,13 @@ namespace BlockifyLib.Launcher.Utils
 
             if (readCount < 5)
                 return;
-            
+
             byte[] fileLengthBytes = new byte[8];
             readCount = input.Read(fileLengthBytes, 0, 8);
 
             if (readCount < 8)
                 return;
-            
+
             long fileLength = BitConverter.ToInt64(fileLengthBytes, 0);
 
             coder.SetDecoderProperties(properties);
