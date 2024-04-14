@@ -12,6 +12,8 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
 
     public class SessionStruct
     {
+        [JsonProperty("id")]
+        public string Id { get; set; }
         [JsonProperty("username")]
         public string? Username { get; set; }
         [JsonProperty("session")]
@@ -42,10 +44,14 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
                 && !string.IsNullOrEmpty(UUID);
         }
 
+        private static string GenerateUniqueId(string username) =>
+            $"{username}_{DateTimeOffset.Now.ToUnixTimeMilliseconds()}";
+
         public static Session GetOfflineSession(string username)
         {
             return new Session
             {
+                Id = GenerateUniqueId(username),
                 Username = username,
                 AccessToken = "access_token",
                 UUID = "user_uuid",
@@ -58,6 +64,7 @@ namespace BlockifyLib.Launcher.Minecraft.Auth
         {
             return new Session
             {
+                Id = GenerateUniqueId(username),
                 Username = username,
                 AccessToken = "access_token",
                 UUID = Guid.NewGuid().ToString().Replace("-", ""),
