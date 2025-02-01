@@ -84,7 +84,7 @@ public static class Extensions
         });
     }
 
-    public static async Task<Session> ExecuteForLauncherAsync(this NestedAuthenticator self)
+    public static async Task<Minecraft.Auth.Session> ExecuteForLauncherAsync(this NestedAuthenticator self)
     {
         var session = await self.ExecuteAsync();
         var account = JEGameAccount.FromSessionStorage(session);
