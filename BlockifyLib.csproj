@@ -14,6 +14,8 @@
     <PackageTags>minecraft; launcher; minecraft-launcher-lib</PackageTags>
     <Version>1.0.3</Version>
     <Platforms>AnyCPU;x64</Platforms>
+	<GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+	<GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
   </PropertyGroup>
 
   <ItemGroup>

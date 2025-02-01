@@ -18,7 +18,7 @@ public class MsalInteractiveOAuth : MsalOAuth
     protected override async ValueTask<AuthenticationResult> AuthenticateWithMsal(
         AuthenticateContext context, MsalOAuthParameters parameters)
     {
-        context.Logger.LogMsalInteractiveOAuth();
+        //context.Logger.LogMsalInteractiveOAuth(); fix-log
 
         var builder = parameters.MsalApplication
             .AcquireTokenInteractive(parameters.Scopes);

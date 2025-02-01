@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+/*using Microsoft.Extensions.Logging;
 
 namespace BlockifyLib.Launcher.XboxAuthNet.Game.Msal;
 
@@ -22,3 +22,4 @@ public static partial class Log
         Message = "Start MsalSilentOAuth: {loginHint}")]
     public static partial void LogMsalSilentOAuth(this ILogger logger, string? loginHint);
 }
+*/

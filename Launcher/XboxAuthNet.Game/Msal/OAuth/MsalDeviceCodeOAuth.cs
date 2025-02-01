@@ -16,7 +16,7 @@ public class MsalDeviceCodeOAuth : MsalOAuth
     protected override async ValueTask<AuthenticationResult> AuthenticateWithMsal(
         AuthenticateContext context, MsalOAuthParameters parameters)
     {
-        context.Logger.LogMsalDeviceCode();
+        //context.Logger.LogMsalDeviceCode(); TODO fix-log
         var result = await parameters.MsalApplication
             .AcquireTokenWithDeviceCode(parameters.Scopes, _deviceCodeResultCallback)
             .ExecuteAsync(context.CancellationToken);
