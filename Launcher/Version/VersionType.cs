@@ -37,6 +37,15 @@
             }
         }
 
+        public static List<VersionType> GetListVersion()
+        {
+            var list = new List<VersionType>();
+            Array days = Enum.GetValues(typeof(VersionType));
+            foreach (VersionType element in days)
+                list.Add(element);
+            return list;
+        }
+
         public static bool CheckOld(string val) =>
             CheckOld(FromString(val));
 
