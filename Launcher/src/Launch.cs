@@ -32,6 +32,16 @@ namespace BlockifyLib.Launcher.src
             this.minecraftPath = option.GetMinecraftPath();
         }
 
+        // Resolve the game directory: a per-instance folder when set (modpacks),
+        // otherwise the shared .minecraft base path.
+        private string GameDir()
+        {
+            string dir = string.IsNullOrEmpty(launchOption.GameDirectory)
+                ? minecraftPath.BasePath : launchOption.GameDirectory!;
+            try { if (!Directory.Exists(dir)) Directory.CreateDirectory(dir); } catch { }
+            return dir;
+        }
+
         public Process GetProcess()
         {
             string arg = string.Join(" ", CreateArg());
@@ -39,7 +49,7 @@ namespace BlockifyLib.Launcher.src
             mc.StartInfo.FileName =
                 useNotNull(launchOption.GetStartVersion().JavaBinaryPath, launchOption.GetJavaPath()) ?? "";
             mc.StartInfo.Arguments = arg;
-            mc.StartInfo.WorkingDirectory = minecraftPath.BasePath;
+            mc.StartInfo.WorkingDirectory = GameDir();
 
             return mc;
         }
@@ -87,7 +97,7 @@ namespace BlockifyLib.Launcher.src
 
                 { "auth_player_name" , session.Username },
                 { "version_name"     , version.id },
-                { "game_directory"   , minecraftPath.BasePath },
+                { "game_directory"   , GameDir() },
                 { "assets_root"      , minecraftPath.Assets },
                 { "assets_index_name", version.AssetId ?? "legacy" },
                 { "auth_uuid"        , session.UUID },

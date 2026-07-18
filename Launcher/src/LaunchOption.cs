@@ -15,6 +15,13 @@ namespace BlockifyLib.Launcher.src
         public int MinimumRamMb { get; set; }
         public string[]? JVMArguments { get; set; }
 
+        /// <summary>
+        /// Per-launch game directory (--gameDir). When set, mods/config/saves/etc. live here
+        /// while versions/libraries/assets stay shared under <see cref="Path"/>. Used to isolate
+        /// modpack instances. Falls back to the base .minecraft path when null.
+        /// </summary>
+        public string? GameDirectory { get; set; }
+
         public string? DockName { get; set; }
         public string? DockIcon { get; set; }
 
