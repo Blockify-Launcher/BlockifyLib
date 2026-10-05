@@ -1,5 +1,6 @@
 ﻿using BlockifyLib.Launcher.Minecraft;
 using BlockifyLib.Launcher.Version.Metadata;
+using System.Diagnostics;
 using System.IO;
 
 namespace BlockifyLib.Launcher.Version.Load
@@ -59,6 +60,8 @@ namespace BlockifyLib.Launcher.Version.Load
         }
     }
 
+    // Local versions first, then the Mojang manifest (live or cached) merged on top.
+    // Network problems never escape: without network and cache the list is local-only (Source = Local).
     public class DefaultVersionLoader : IVersionLoader
     {
         public DefaultVersionLoader(MinecraftPath path) =>
@@ -69,22 +72,36 @@ namespace BlockifyLib.Launcher.Version.Load
         public VersionCollection GetVersionMetadatas()
         {
             LocalVersionLoader localVersionLoader = new LocalVersionLoader(MinecraftPath);
-            MojangLoader mojangVersionLoader = new MojangLoader();
+            MojangLoader mojangVersionLoader = new MojangLoader(MinecraftPath);
 
             VersionCollection localVersions = localVersionLoader.GetVersionMetadatas();
-            localVersions.Merge(mojangVersionLoader.GetVersionMetadatas());
+            try
+            {
+                localVersions.Merge(mojangVersionLoader.GetVersionMetadatas());
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
             return localVersions;
         }
 
         public async Task<VersionCollection> GetVersionMetadatasAsync()
         {
             LocalVersionLoader localVersionLoader = new LocalVersionLoader(MinecraftPath);
-            MojangLoader mojangVersionLoader = new MojangLoader();
+            MojangLoader mojangVersionLoader = new MojangLoader(MinecraftPath);
 
             VersionCollection localVersions = await localVersionLoader.GetVersionMetadatasAsync()
                 .ConfigureAwait(false);
-            localVersions.Merge(await mojangVersionLoader.GetVersionMetadatasAsync()
-                .ConfigureAwait(false));
+            try
+            {
+                localVersions.Merge(await mojangVersionLoader.GetVersionMetadatasAsync()
+                    .ConfigureAwait(false));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
             return localVersions;
         }
     }

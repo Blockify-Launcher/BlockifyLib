@@ -1,4 +1,5 @@
-﻿using BlockifyLib.Launcher.Minecraft.Mojang;
+﻿using BlockifyLib.Launcher.Downloader;
+using BlockifyLib.Launcher.Minecraft.Mojang;
 using BlockifyLib.Launcher.src;
 using BlockifyLib.Launcher.Utils;
 using Newtonsoft.Json.Linq;
@@ -95,21 +96,52 @@ namespace BlockifyLib.Launcher.Minecraft
 
         public string GetJavaUrl()
         {
-            using (var wc = new WebClient())
-            {
-                string json = wc.DownloadString(MojangServer.LauncherMeta);
-                return parseLauncherMetadata(json);
-            }
+            string json = LibHttp.GetString(MojangServer.LauncherMeta);
+            return parseLauncherMetadata(json);
         }
 
         public async Task<string> GetJavaUrlAsync()
         {
-            using (var wc = new WebClient())
+            string json = await LibHttp.GetStringAsync(MojangServer.LauncherMeta)
+                .ConfigureAwait(false);
+            return parseLauncherMetadata(json);
+        }
+
+        // Major version of a Java install from its "release" file (JAVA_VERSION="17.0.8" -> 17,
+        // "1.8.0_381" -> 8). javaBinaryPath is <home>/bin/java(w). Returns 0 when unknown.
+        public static int GetMajorVersion(string javaBinaryPath)
+        {
+            try
             {
-                string json = await wc.DownloadStringTaskAsync(MojangServer.LauncherMeta)
-                    .ConfigureAwait(false);
-                return parseLauncherMetadata(json);
+                string? binDir = Path.GetDirectoryName(javaBinaryPath);
+                string? home = string.IsNullOrEmpty(binDir) ? null : Path.GetDirectoryName(binDir);
+                if (string.IsNullOrEmpty(home))
+                    return 0;
+
+                string release = Path.Combine(home, "release");
+                if (!File.Exists(release))
+                    return 0;
+
+                foreach (string line in File.ReadLines(release))
+                {
+                    if (!line.StartsWith("JAVA_VERSION="))
+                        continue;
+
+                    string value = line.Substring("JAVA_VERSION=".Length).Trim().Trim('"');
+                    string[] parts = value.Split('.', '_', '-', '+');
+                    if (!int.TryParse(parts[0], out int first))
+                        return 0;
+                    if (first == 1 && parts.Length > 1 && int.TryParse(parts[1], out int second))
+                        return second;
+                    return first;
+                }
             }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(ex);
+            }
+
+            return 0;
         }
 
         private string parseLauncherMetadata(string json)
@@ -143,12 +175,10 @@ namespace BlockifyLib.Launcher.Minecraft
             Directory.CreateDirectory(RuntimeDirectory);
             string lzmapath = Path.Combine(Path.GetTempPath(), "jre.lzma");
 
-            using (var wc = new WebClient())
-            {
-                wc.DownloadProgressChanged += Downloader_DownloadProgressChangedEvent;
-                await wc.DownloadFileTaskAsync(javaUrl, lzmapath)
-                    .ConfigureAwait(false);
-            }
+            var webdownloader = new WebDownload();
+            webdownloader.DownloadProgressChangedEvent += Downloader_DownloadProgressChangedEvent;
+            await webdownloader.DownloadFileAsync(new DownloadFile(lzmapath, javaUrl))
+                .ConfigureAwait(false);
 
             return lzmapath;
         }

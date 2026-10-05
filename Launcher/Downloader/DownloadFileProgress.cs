@@ -42,17 +42,41 @@
         public object Source { get; private set; }
     }
 
+    // Thrown when game files are still missing after all retries (K-2).
     public class DownloadFileException : Exception
     {
         public DownloadFileException(DownloadFile exFile)
-            : this(null, null, exFile) { }
+            : this((string?)null, null, exFile) { }
 
         public DownloadFileException(string? message, Exception? innerException, DownloadFile? exFile)
             : base(message, innerException)
         {
             ExceptionFile = exFile;
+            FailedFiles = exFile == null
+                ? Array.Empty<string>()
+                : new[] { exFile.Name ?? exFile.Path };
+        }
+
+        public DownloadFileException(IReadOnlyList<string> failedFiles, Exception? innerException,
+            DownloadFile? firstFile = null)
+            : base(BuildMessage(failedFiles.Count), innerException)
+        {
+            FailedFiles = failedFiles;
+            ExceptionFile = firstFile;
         }
 
         public DownloadFile? ExceptionFile { get; private set; }
+
+        // Names (or paths) of the files that could not be downloaded.
+        public IReadOnlyList<string> FailedFiles { get; }
+
+        public static string BuildMessage(int count)
+        {
+            int mod10 = count % 10, mod100 = count % 100;
+            string word = mod10 == 1 && mod100 != 11 ? "файл"
+                : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14) ? "файла"
+                : "файлов";
+            return $"Не удалось скачать {count} {word} игры. Проверь интернет и попробуй ещё раз.";
+        }
     }
 }

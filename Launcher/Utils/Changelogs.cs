@@ -1,5 +1,4 @@
 ﻿using Newtonsoft.Json.Linq;
-using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -16,14 +15,8 @@ namespace BlockifyLib.Launcher.Utils
 
         public static async Task<Changelogs> GetChangelogs()
         {
-            string response;
-            using (var wc = new WebClient())
-            {
-                var url = "https://launchercontent.mojang.com/javaPatchNotes.json";
-                var data = await wc.DownloadDataTaskAsync(url)
-                    .ConfigureAwait(false);
-                response = Encoding.UTF8.GetString(data);
-            }
+            var url = "https://launchercontent.mojang.com/javaPatchNotes.json";
+            string response = await LibHttp.GetStringAsync(url).ConfigureAwait(false);
 
             var obj = JObject.Parse(response);
             var versionDict = new Dictionary<string, string?>();
@@ -80,12 +73,7 @@ namespace BlockifyLib.Launcher.Utils
 
         private async Task<string> GetChangelogFromUrl(string url)
         {
-            string html;
-            using (var wc = new WebClient())
-            {
-                var data = await wc.DownloadDataTaskAsync(url).ConfigureAwait(false);
-                html = Encoding.UTF8.GetString(data);
-            }
+            string html = await LibHttp.GetStringAsync(url).ConfigureAwait(false);
 
             var regResult = articleRegex.Match(html);
             if (!regResult.Success)

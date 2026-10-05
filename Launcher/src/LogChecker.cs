@@ -59,7 +59,8 @@ namespace BlockifyLib.Launcher.src
                 return new DownloadFile(clientPath, version.LoggingClient.Url)
                 {
                     Type = TypeFile.Others,
-                    Name = version.LoggingClient.Id
+                    Name = version.LoggingClient.Id,
+                    Hash = version.LoggingClient.Sha1
                 };
             }
             else

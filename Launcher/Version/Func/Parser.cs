@@ -37,6 +37,8 @@ namespace BlockifyLib.Launcher.Version.Func
 
                 // javaVersion
                 version.JavaVersion = job["javaVersion"]?["component"]?.ToString();
+                if (int.TryParse(job["javaVersion"]?["majorVersion"]?.ToString(), out int javaMajor))
+                    version.JavaMajorVersion = javaMajor;
 
                 // assets
                 var assetindex = job["assetIndex"];

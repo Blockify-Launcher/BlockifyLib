@@ -15,6 +15,8 @@ namespace BlockifyLib.Launcher.Version
         public string? AssetHash { get; set; }
 
         public string? JavaVersion { get; set; }
+        // javaVersion.majorVersion from the version json; 0 = unknown.
+        public int JavaMajorVersion { get; set; }
         public string? JavaBinaryPath { get; set; }
         public string? Jar { get; set; }
         public string? ClientDownloadUrl { get; set; }
@@ -54,6 +56,9 @@ namespace BlockifyLib.Launcher.Version
 
             if (nc(JavaVersion))
                 JavaVersion = vers.JavaVersion;
+
+            if (JavaMajorVersion <= 0)
+                JavaMajorVersion = vers.JavaMajorVersion;
 
             if (LoggingClient == null)
                 LoggingClient = vers.LoggingClient;

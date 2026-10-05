@@ -5,6 +5,9 @@ using System.IO;
 
 namespace BlockifyLib.Launcher.Version
 {
+    // Where the version list came from: local folders only, cached manifest, or live manifest.
+    public enum VersionSource { Local, Cache, Live }
+
     public class VersionCollection : IEnumerable<Metadata.VersionMetadata>
     {
         public VersionCollection(Metadata.VersionMetadata[] datas)
@@ -18,6 +21,7 @@ namespace BlockifyLib.Launcher.Version
         public Metadata.VersionMetadata? LatestReleaseVersion { get; private set; }
         public Metadata.VersionMetadata? LatestSnapshotVersion { get; private set; }
         public MinecraftPath? MinecraftPath { get; private set; }
+        public VersionSource Source { get; set; } = VersionSource.Local;
         protected OrderedDictionary Versions;
 
         public VersionCollection(
@@ -140,6 +144,9 @@ namespace BlockifyLib.Launcher.Version
 
             if (this.LatestSnapshotVersion == null && from.LatestSnapshotVersion != null)
                 this.LatestSnapshotVersion = from.LatestSnapshotVersion;
+
+            if (from.Source > this.Source)
+                this.Source = from.Source;
         }
 
         public IEnumerator<Metadata.VersionMetadata> GetEnumerator()

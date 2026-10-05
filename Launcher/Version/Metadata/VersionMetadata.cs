@@ -2,7 +2,6 @@
 using BlockifyLib.Launcher.Utils;
 using Newtonsoft.Json;
 using System.IO;
-using System.Net;
 
 namespace BlockifyLib.Launcher.Version.Metadata
 {
@@ -160,14 +159,14 @@ namespace BlockifyLib.Launcher.Version.Metadata
         {
             if (string.IsNullOrEmpty(Path))
                 throw new InvalidOperationException("Path property was null");
-            return new WebClient().DownloadString(Path);
+            return LibHttp.GetString(Path);
         }
 
         protected override async Task<string> ReadMetadataAsync()
         {
             if (string.IsNullOrEmpty(Path))
                 throw new InvalidOperationException("Path property was null");
-            return await new WebClient().DownloadStringTaskAsync(Path)
+            return await LibHttp.GetStringAsync(Path)
                 .ConfigureAwait(false);
         }
     }

@@ -5,7 +5,6 @@ using BlockifyLib.Launcher.Utils;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 
 namespace BlockifyLib.Launcher.src
 {
@@ -53,13 +52,28 @@ namespace BlockifyLib.Launcher.src
             if (!string.IsNullOrEmpty(version.AssetUrl))
                 if (!IOUtil.CheckFileValidation(index, version.AssetHash, CheckHash))
                 {
-                    var directoryName = Path.GetDirectoryName(index);
-                    if (!string.IsNullOrEmpty(directoryName))
-                        Directory.CreateDirectory(directoryName);
-
-                    using (var wc = new WebClient())
+                    string indexName = "assets/indexes/" + version.AssetId + ".json";
+                    var file = new DownloadFile(index, version.AssetUrl)
                     {
-                        wc.DownloadFile(version.AssetUrl, index);
+                        Type = TypeFile.Resource,
+                        Name = indexName,
+                        Hash = version.AssetHash
+                    };
+
+                    try
+                    {
+                        WebDownload.DownloadWithRetry(file, 3);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Offline with an outdated index: keep playing with the old one.
+                        if (File.Exists(index))
+                        {
+                            Debug.WriteLine(ex);
+                            return;
+                        }
+
+                        throw new DownloadFileException(new[] { indexName }, ex, file);
                     }
                 }
         }
@@ -156,6 +170,7 @@ namespace BlockifyLib.Launcher.src
                     Type = TypeFile.Resource,
                     Name = key,
                     Size = size,
+                    Hash = hash,
                     AfterDownload = afterDownload.ToArray()
                 };
             else

@@ -5,7 +5,6 @@ using BlockifyLib.Launcher.Utils;
 using Newtonsoft.Json.Linq;
 using System.Diagnostics;
 using System.IO;
-using System.Net;
 
 namespace BlockifyLib.Launcher.src
 {
@@ -92,10 +91,36 @@ namespace BlockifyLib.Launcher.src
         }
     }
 
+    // Thrown when the needed Java is not on disk and cannot be downloaded (K-2).
+    public class JavaNotAvailableException : Exception
+    {
+        public JavaNotAvailableException(string component, int majorVersion, Exception? innerException = null)
+            : base(buildMessage(majorVersion), innerException)
+        {
+            Component = component;
+            MajorVersion = majorVersion;
+        }
+
+        public string Component { get; }
+        public int MajorVersion { get; }
+
+        private static string buildMessage(int majorVersion) =>
+            (majorVersion > 0 ? $"Для этой версии нужна Java {majorVersion}" : "Для этой версии нужна Java")
+            + ", но она ещё не скачана, а скачать её сейчас не получилось. Проверь интернет и попробуй ещё раз.";
+    }
+
     public class JavaChecker : IFileChecker
     {
         public string JavaManifestServer { get; set; } = MojangServer.JavaManifest;
         public bool CheckHash { get; set; } = true;
+
+        // Timeout of each Java manifest request.
+        public static TimeSpan RequestTimeout { get; set; } = TimeSpan.FromSeconds(10);
+
+        // A runtime verified this recently is used without asking the network.
+        public static TimeSpan VerifiedRuntimeTtl { get; set; } = TimeSpan.FromDays(7);
+
+        private const string VerifiedMarkerName = ".blockify-verified";
 
         public DownloadFile[]? CheckFiles(MinecraftPath path, Version.Version version,
             IProgress<DownloadFileChangedEventArgs>? downloadProgress)
@@ -108,7 +133,7 @@ namespace BlockifyLib.Launcher.src
                 javaVersion = MinecraftJavaPathResolver.JreLegacyVersionName;
 
             var files = CheckJava(
-                javaVersion, path, downloadProgress, out string binPath);
+                javaVersion, version.JavaMajorVersion, path, downloadProgress, out string binPath);
 
             version.JavaBinaryPath = binPath;
             return files;
@@ -122,9 +147,18 @@ namespace BlockifyLib.Launcher.src
 
         public DownloadFile[] CheckJava(string javaVersion, MinecraftPath path,
             IProgress<DownloadFileChangedEventArgs>? downloadProgress, out string binPath)
+            => CheckJava(javaVersion, 0, path, downloadProgress, out binPath);
+
+        public DownloadFile[] CheckJava(string javaVersion, int majorVersion, MinecraftPath path,
+            IProgress<DownloadFileChangedEventArgs>? downloadProgress, out string binPath)
         {
             var javaPathResolver = new MinecraftJavaPathResolver(path);
             binPath = javaPathResolver.GetJavaBinaryPath(javaVersion, Rule.OSName);
+            string javaDir = javaPathResolver.GetJavaDirPath(javaVersion);
+
+            // Runtime is on disk and was fully verified recently: no network needed.
+            if (File.Exists(binPath) && isRecentlyVerified(javaDir))
+                return new DownloadFile[] { };
 
             try
             {
@@ -144,7 +178,10 @@ namespace BlockifyLib.Launcher.src
                     if (files == null)
                         return legacyJavaChecker(path, out binPath);
 
-                    return toDownloadFiles(files, javaPathResolver.GetJavaDirPath(javaVersion), downloadProgress);
+                    var result = toDownloadFiles(files, javaDir, downloadProgress);
+                    if (result.Length == 0)
+                        markVerified(javaDir);
+                    return result;
                 }
                 else
                     return legacyJavaChecker(path, out binPath);
@@ -153,10 +190,37 @@ namespace BlockifyLib.Launcher.src
             {
                 Debug.WriteLine(e);
 
-                if (string.IsNullOrEmpty(binPath))
-                    return legacyJavaChecker(path, out binPath);
-                else
+                // Offline: a runtime that is already on disk is good enough.
+                if (File.Exists(binPath))
                     return new DownloadFile[] { };
+
+                throw new JavaNotAvailableException(javaVersion, majorVersion, e);
+            }
+        }
+
+        private static bool isRecentlyVerified(string javaDir)
+        {
+            try
+            {
+                var marker = new FileInfo(Path.Combine(javaDir, VerifiedMarkerName));
+                return marker.Exists && DateTime.UtcNow - marker.LastWriteTimeUtc < VerifiedRuntimeTtl;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void markVerified(string javaDir)
+        {
+            try
+            {
+                if (Directory.Exists(javaDir))
+                    File.WriteAllText(Path.Combine(javaDir, VerifiedMarkerName), DateTime.UtcNow.ToString("o"));
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
             }
         }
 
@@ -176,10 +240,7 @@ namespace BlockifyLib.Launcher.src
 
         private JObject? getJavaVersionsForOs(string osName)
         {
-            string response;
-
-            using (WebClient webClient = new WebClient())
-                response = webClient.DownloadString(JavaManifestServer);
+            string response = LibHttp.GetString(JavaManifestServer, RequestTimeout);
             return JObject.Parse(response)[osName] as JObject;
         }
 
@@ -193,12 +254,7 @@ namespace BlockifyLib.Launcher.src
             if (string.IsNullOrEmpty(manifestUrl))
                 return null;
 
-            string response;
-            using (var wc = new WebClient())
-            {
-                response = wc.DownloadString(manifestUrl); // ex
-            }
-
+            string response = LibHttp.GetString(manifestUrl, RequestTimeout); // ex
             return JObject.Parse(response); // ex
         }
 
@@ -264,7 +320,9 @@ namespace BlockifyLib.Launcher.src
 
             return new DownloadFile(filePath, url)
             {
-                Size = size
+                Type = TypeFile.Runtime,
+                Size = size,
+                Hash = hash
             };
         }
 

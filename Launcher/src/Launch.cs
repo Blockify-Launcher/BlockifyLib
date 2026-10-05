@@ -1,7 +1,7 @@
 ﻿using BlockifyLib.Launcher.Minecraft;
-using BlockifyLib.Launcher.Utils;
 using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace BlockifyLib.Launcher.src
 {
@@ -44,11 +44,14 @@ namespace BlockifyLib.Launcher.src
 
         public Process GetProcess()
         {
-            string arg = string.Join(" ", CreateArg());
             Process mc = new Process();
             mc.StartInfo.FileName =
                 useNotNull(launchOption.GetStartVersion().JavaBinaryPath, launchOption.GetJavaPath()) ?? "";
-            mc.StartInfo.Arguments = arg;
+
+            // One entry per real argument: .NET quotes and escapes each of them itself.
+            foreach (string arg in CreateArgList())
+                mc.StartInfo.ArgumentList.Add(arg);
+
             mc.StartInfo.WorkingDirectory = GameDir();
 
             return mc;
@@ -67,7 +70,8 @@ namespace BlockifyLib.Launcher.src
             if (!string.IsNullOrEmpty(version.Jar))
                 classpath.Add(minecraftPath.GetVersionJarPath(version.Jar));
 
-            return IOUtil.CombinePath(classpath.ToArray());
+            // Raw value: the whole classpath is one argument, no quotes inside.
+            return string.Join(Path.PathSeparator.ToString(), classpath.Select(p => Path.GetFullPath(p)));
         }
 
         private string createNativePath(Version.Version version)
@@ -77,7 +81,12 @@ namespace BlockifyLib.Launcher.src
             return native.ExtractNatives();
         }
 
-        public string[] CreateArg()
+        // Command-line form: one quoted entry per argument, so string.Join(" ", ...) is a valid command line.
+        public string[] CreateArg() =>
+            CreateArgList().Select(a => QuoteArgument(a)).ToArray();
+
+        // Raw arguments for ProcessStartInfo.ArgumentList: one entry per argument, no quoting.
+        public List<string> CreateArgList()
         {
             Version.Version version = launchOption.GetStartVersion();
             List<string> args = new List<string>();
@@ -112,69 +121,198 @@ namespace BlockifyLib.Launcher.src
             };
 
             if (version.JvmArguments != null)
-                args.AddRange(Mapper.MapInterpolation(version.JvmArguments, argDict));
+                args.AddRange(Mapper.MapInterpolation(version.JvmArguments, argDict, false));
+
+            // Heap size always comes from the launch option; custom JVM arguments only add to it.
+            if (launchOption.MaximumRamMb > 0)
+                args.Add("-Xmx" + launchOption.MaximumRamMb + "m");
+
+            if (launchOption.MinimumRamMb > 0)
+                args.Add("-Xms" + launchOption.MinimumRamMb + "m");
 
             if (launchOption.JVMArguments != null)
-                args.AddRange(launchOption.JVMArguments);
-            else
             {
-                if (launchOption.MaximumRamMb > 0)
-                    args.Add("-Xmx" + launchOption.MaximumRamMb + "m");
-
-                if (launchOption.MinimumRamMb > 0)
-                    args.Add("-Xms" + launchOption.MinimumRamMb + "m");
-
-                args.AddRange(DefaultJavaParameter);
+                bool ownHeap = launchOption.MaximumRamMb > 0 || launchOption.MinimumRamMb > 0;
+                args.AddRange(normalizeUserArgs(launchOption.JVMArguments).Where(a => !string.IsNullOrWhiteSpace(a)
+                    && !(ownHeap && (a.StartsWith("-Xmx") || a.StartsWith("-Xms")))));
+                if (!args.Any(a => a.StartsWith("-Dlog4j2.formatMsgNoLookups")))
+                    args.Add("-Dlog4j2.formatMsgNoLookups=true");
             }
+            else
+                args.AddRange(DefaultJavaParameter);
 
             if (version.JvmArguments == null)
             {
-                args.Add("-Djava.library.path=" + handleEmpty(nativePath));
-                args.Add("-cp " + classpath);
+                args.Add("-Djava.library.path=" + nativePath);
+                args.Add("-cp");
+                args.Add(classpath);
             }
 
             if (!string.IsNullOrEmpty(launchOption.DockName))
-                args.Add("-Xdock:name=" + handleEmpty(launchOption.DockName));
+                args.Add("-Xdock:name=" + launchOption.DockName);
             if (!string.IsNullOrEmpty(launchOption.DockIcon))
-                args.Add("-Xdock:icon=" + handleEmpty(launchOption.DockIcon));
+                args.Add("-Xdock:icon=" + launchOption.DockIcon);
 
             var loggingArgument = version.LoggingClient?.Argument;
             if (!string.IsNullOrEmpty(loggingArgument))
                 args.Add(Mapper.Interpolation(loggingArgument, new Dictionary<string, string?>()
                 {
                     { "path", minecraftPath.GetLogConfigFilePath(version.LoggingClient?.Id ?? version.id) }
-                }, true));
+                }, false));
 
             if (!string.IsNullOrEmpty(version.MainClass))
                 args.Add(version.MainClass);
 
             if (version.GameArguments != null)
-                args.AddRange(Mapper.MapInterpolation(version.GameArguments, argDict));
+                args.AddRange(Mapper.MapInterpolation(version.GameArguments, argDict, false));
             else if (!string.IsNullOrEmpty(version.MinecraftArguments))
-                args.AddRange(Mapper.MapInterpolation(version.MinecraftArguments.Split(' '), argDict));
+                args.AddRange(Mapper.MapInterpolation(
+                    version.MinecraftArguments.Split(' ', StringSplitOptions.RemoveEmptyEntries), argDict, false));
 
             if (!string.IsNullOrEmpty(launchOption.ServerIp))
             {
+                args.Add("--quickPlayMultiplayer");
                 if (launchOption.ServerPort != DefaultServerPort)
-                    args.Add("--quickPlayMultiplayer " + $"{launchOption.ServerIp}:{launchOption.ServerPort}");
+                    args.Add($"{launchOption.ServerIp}:{launchOption.ServerPort}");
                 else
-                    args.Add("--quickPlayMultiplayer " + $"{launchOption.ServerIp}");
-                args.Add("--server " + handleEmpty(launchOption.ServerIp));
+                    args.Add(launchOption.ServerIp);
+
+                args.Add("--server");
+                args.Add(launchOption.ServerIp);
 
                 if (launchOption.ServerPort != DefaultServerPort)
-                    args.Add("--port " + launchOption.ServerPort);
+                {
+                    args.Add("--port");
+                    args.Add(launchOption.ServerPort.ToString());
+                }
             }
 
             if (launchOption.ScreenWidth > 0 && launchOption.ScreenHeight > 0)
             {
-                args.Add("--width " + launchOption.ScreenWidth);
-                args.Add("--height " + launchOption.ScreenHeight);
+                args.Add("--width");
+                args.Add(launchOption.ScreenWidth.ToString());
+                args.Add("--height");
+                args.Add(launchOption.ScreenHeight.ToString());
             }
 
             if (launchOption.FullScreen)
                 args.Add("--fullscreen");
 
-            return args.ToArray();
+            return args;
+        }
+
+        // Custom JVM args used to be joined into one command line, so quotes typed by the user
+        // grouped words. Keep that meaning: when any entry has a quote, re-split the joined line.
+        private static IEnumerable<string> normalizeUserArgs(string[] userArgs)
+        {
+            if (!userArgs.Any(a => a != null && a.Contains('"')))
+                return userArgs;
+
+            return SplitCommandLine(string.Join(" ", userArgs));
+        }
+
+        // Splits a command line by the Windows (MSVC) rules: spaces separate, quotes group,
+        // backslashes escape only before a quote.
+        public static List<string> SplitCommandLine(string commandLine)
+        {
+            var result = new List<string>();
+            var current = new StringBuilder();
+            bool inQuotes = false;
+            bool hasToken = false;
+            int i = 0;
+
+            while (i < commandLine.Length)
+            {
+                char c = commandLine[i];
+                if (c == '\\')
+                {
+                    int backslashes = 0;
+                    while (i < commandLine.Length && commandLine[i] == '\\')
+                    {
+                        backslashes++;
+                        i++;
+                    }
+
+                    if (i < commandLine.Length && commandLine[i] == '"')
+                    {
+                        current.Append('\\', backslashes / 2);
+                        if (backslashes % 2 == 1)
+                        {
+                            current.Append('"');
+                            i++;
+                        }
+                    }
+                    else
+                        current.Append('\\', backslashes);
+
+                    hasToken = true;
+                    continue;
+                }
+
+                if (c == '"')
+                {
+                    inQuotes = !inQuotes;
+                    hasToken = true;
+                }
+                else if ((c == ' ' || c == '\t') && !inQuotes)
+                {
+                    if (hasToken)
+                    {
+                        result.Add(current.ToString());
+                        current.Clear();
+                        hasToken = false;
+                    }
+                }
+                else
+                {
+                    current.Append(c);
+                    hasToken = true;
+                }
+                i++;
+            }
+
+            if (hasToken)
+                result.Add(current.ToString());
+
+            return result;
+        }
+
+        // Quotes one argument by the Windows (MSVC) rules; the reverse of SplitCommandLine.
+        public static string QuoteArgument(string arg)
+        {
+            if (arg.Length > 0 && arg.IndexOfAny(new[] { ' ', '\t', '\n', '\v', '"' }) < 0)
+                return arg;
+
+            var sb = new StringBuilder(arg.Length + 2);
+            sb.Append('"');
+            for (int i = 0; i < arg.Length; i++)
+            {
+                int backslashes = 0;
+                while (i < arg.Length && arg[i] == '\\')
+                {
+                    backslashes++;
+                    i++;
+                }
+
+                if (i == arg.Length)
+                {
+                    sb.Append('\\', backslashes * 2);
+                    break;
+                }
+
+                if (arg[i] == '"')
+                {
+                    sb.Append('\\', backslashes * 2 + 1);
+                    sb.Append('"');
+                }
+                else
+                {
+                    sb.Append('\\', backslashes);
+                    sb.Append(arg[i]);
+                }
+            }
+            sb.Append('"');
+            return sb.ToString();
         }
 
         private string? useNotNull(string? input1, string? input2)
@@ -183,17 +321,6 @@ namespace BlockifyLib.Launcher.src
                 return input2;
             else
                 return input1;
-        }
-
-        private string? handleEmpty(string? input)
-        {
-            if (input == null)
-                return null;
-
-            if (input.Contains(" "))
-                return "\"" + input + "\"";
-            else
-                return input;
         }
     }
 }

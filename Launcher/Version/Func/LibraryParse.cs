@@ -80,6 +80,7 @@ namespace BlockifyLib.Launcher.Version.Func
                 path = PackageName.Parse(name).GetPath(nativeId);
 
             var hash = job["sha1"] ?? job["checksums"]?[0];
+            bool strictHash = job["sha1"] != null || (job["checksums"] as JArray)?.Count <= 1;
 
             long size = 0;
             string? sizeStr = job["size"]?.ToString();
@@ -89,6 +90,7 @@ namespace BlockifyLib.Launcher.Version.Func
             return new Library
             {
                 Hash = hash?.ToString(),
+                StrictHash = strictHash,
                 IsNative = !string.IsNullOrEmpty(nativeId),
                 Name = name,
                 Path = path,

@@ -19,10 +19,14 @@ namespace BlockifyLib.Launcher
         }
 
         public static string[] MapInterpolation(string[] arg, Dictionary<string, string?> dicts)
+            => MapInterpolation(arg, dicts, true);
+
+        // handleEmpty = false keeps values raw (one argument each, for ProcessStartInfo.ArgumentList).
+        public static string[] MapInterpolation(string[] arg, Dictionary<string, string?> dicts, bool handleEmpty)
         {
             List<string> args = new List<string>(arg.Length);
             foreach (string item in arg)
-                args.Add(Interpolation(item, dicts, true));
+                args.Add(Interpolation(item, dicts, handleEmpty));
 
             return args.ToArray();
         }

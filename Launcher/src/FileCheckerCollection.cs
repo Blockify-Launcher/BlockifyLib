@@ -224,7 +224,8 @@ namespace BlockifyLib.Launcher.src
                 return new DownloadFile(clientPath, version.ClientDownloadUrl)
                 {
                     Type = TypeFile.Minecraft,
-                    Name = id
+                    Name = id,
+                    Hash = version.ClientHash
                 };
             }
             else
@@ -297,7 +298,8 @@ namespace BlockifyLib.Launcher.src
                         {
                             Type = TypeFile.Library,
                             Name = library.Name,
-                            Size = library.Size
+                            Size = library.Size,
+                            Hash = library.StrictHash ? library.Hash : null
                         });
                     }
                 }

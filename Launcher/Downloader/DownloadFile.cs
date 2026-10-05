@@ -19,6 +19,9 @@
         public string Url { get; private set; }
         public long Size { get; set; }
 
+        // Expected sha1 (lowercase hex); null = no hash check after download.
+        public string? Hash { get; set; }
+
         public Func<Task>[]? AfterDownload { get; set; }
 
         public override int GetHashCode()

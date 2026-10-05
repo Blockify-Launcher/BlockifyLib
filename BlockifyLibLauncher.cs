@@ -3,8 +3,10 @@ using BlockifyLib.Launcher.Minecraft;
 using BlockifyLib.Launcher.src;
 using BlockifyLib.Launcher.Version;
 using BlockifyLib.Launcher.Version.Load;
+using BlockifyLib.Launcher.Version.Metadata;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.IO;
 
 namespace BlockifyLib
 {
@@ -62,6 +64,7 @@ namespace BlockifyLib
             if (Versions == null)
                 GetAllVersions();
 
+            preferLocalVersion(versionName);
             return Versions!.GetVersion(versionName);
         }
 
@@ -70,9 +73,39 @@ namespace BlockifyLib
             if (Versions == null)
                 await GetAllVersionsAsync().ConfigureAwait(false);
 
+            preferLocalVersion(versionName);
             var version = await Versions!.GetVersionAsync(versionName)
                 .ConfigureAwait(false);
             return version;
+        }
+
+        // A version installed after the list was loaded (or listed only as a web version)
+        // is read from versions/<id>/<id>.json, so it starts without network.
+        private void preferLocalVersion(string versionName)
+        {
+            if (Versions == null || string.IsNullOrEmpty(versionName))
+                return;
+
+            try
+            {
+                if (Versions.Contains(versionName) && Versions.GetVersionMetadata(versionName).IsLocalVersion)
+                    return;
+
+                string jsonPath = MinecraftPath.GetVersionJsonPath(versionName);
+                if (!File.Exists(jsonPath))
+                    return;
+
+                Versions.AddVersion(new LocalVersion(versionName)
+                {
+                    Path = jsonPath,
+                    Type = "local",
+                    ProfType = ProfileConverter.VersionType.Custom
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine(ex);
+            }
         }
 
         public async Task<DownloadFile[]> CheckLostGameFilesTaskAsync(Launcher.Version.Version version)
@@ -131,6 +164,7 @@ namespace BlockifyLib
         public Process CreateProcess(Launcher.Version.Version version, LaunchOption option, bool checkAndDownload = true)
         {
             option.StartVersion = version;
+            applyCustomJava(option);
 
             if (checkAndDownload)
                 CheckAndDownload(option.StartVersion);
@@ -149,6 +183,7 @@ namespace BlockifyLib
             bool checkAndDownload = true)
         {
             option.StartVersion = version;
+            applyCustomJava(option);
 
             if (checkAndDownload)
                 await CheckAndDownloadAsync(option.StartVersion).ConfigureAwait(false);
@@ -185,13 +220,41 @@ namespace BlockifyLib
             return process;
         }
 
+        // Custom Java goes in before the file check, so JavaChecker doesn't need the bundled
+        // runtime (or the network) for it. An obviously too old Java is ignored.
+        private void applyCustomJava(LaunchOption option)
+        {
+            var version = option.StartVersion;
+            if (version != null && !string.IsNullOrEmpty(option.JavaPath)
+                && isCustomJavaUsable(option.JavaPath, version, false))
+                version.JavaBinaryPath = option.JavaPath;
+        }
+
+        // false when the version json asks for a newer major Java than the custom one.
+        private bool isCustomJavaUsable(string javaPath, Launcher.Version.Version version, bool log)
+        {
+            int required = version.JavaMajorVersion;
+            if (required <= 0)
+                return true;
+
+            int actual = Java.GetMajorVersion(javaPath);
+            if (actual <= 0 || actual >= required)
+                return true;
+
+            if (log)
+                LogOutput?.Invoke(this,
+                    $"Custom Java {actual} ({javaPath}) is too old for {version.id} (needs Java {required}), using the bundled runtime");
+            return false;
+        }
+
         private void checkLaunchOption(LaunchOption option)
         {
             if (option.Path == null)
                 option.Path = MinecraftPath;
             if (option.StartVersion != null)
             {
-                if (!string.IsNullOrEmpty(option.JavaPath))
+                if (!string.IsNullOrEmpty(option.JavaPath)
+                    && isCustomJavaUsable(option.JavaPath, option.StartVersion, true))
                     option.StartVersion.JavaBinaryPath = option.JavaPath;
                 else if (!string.IsNullOrEmpty(option.JavaVersion))
                     option.StartVersion.JavaVersion = option.JavaVersion;
